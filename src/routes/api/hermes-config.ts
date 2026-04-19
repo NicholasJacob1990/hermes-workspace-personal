@@ -12,6 +12,7 @@ import {
   ensureGatewayProbed,
   getCapabilities,
 } from '../../server/gateway-capabilities'
+import { HERMES_PROVIDERS } from '../../server/hermes-provider-catalog'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
@@ -19,67 +20,6 @@ type AuthResult = Response | true
 const HERMES_HOME = path.join(os.homedir(), '.hermes')
 const CONFIG_PATH = path.join(HERMES_HOME, 'config.yaml')
 const ENV_PATH = path.join(HERMES_HOME, '.env')
-
-// Known Hermes providers
-const PROVIDERS = [
-  { id: 'nous', name: 'Nous Portal', authType: 'oauth', envKeys: [] },
-  { id: 'openai-codex', name: 'OpenAI Codex', authType: 'oauth', envKeys: [] },
-  {
-    id: 'anthropic',
-    name: 'Anthropic',
-    authType: 'api_key',
-    envKeys: ['ANTHROPIC_API_KEY'],
-  },
-  {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    authType: 'api_key',
-    envKeys: ['OPENROUTER_API_KEY'],
-  },
-  {
-    id: 'zai',
-    name: 'Z.AI / GLM',
-    authType: 'api_key',
-    envKeys: ['GLM_API_KEY'],
-  },
-  {
-    id: 'kimi-coding',
-    name: 'Kimi / Moonshot',
-    authType: 'api_key',
-    envKeys: ['KIMI_API_KEY'],
-  },
-  {
-    id: 'minimax',
-    name: 'MiniMax',
-    authType: 'api_key',
-    envKeys: ['MINIMAX_API_KEY'],
-  },
-  {
-    id: 'minimax-cn',
-    name: 'MiniMax (China)',
-    authType: 'api_key',
-    envKeys: ['MINIMAX_CN_API_KEY'],
-  },
-  {
-    id: 'xiaomi',
-    name: 'Xiaomi MiMo',
-    authType: 'api_key',
-    envKeys: ['XIAOMI_API_KEY'],
-  },
-  { id: 'ollama', name: 'Ollama (Local)', authType: 'none', envKeys: [] },
-  {
-    id: 'atomic-chat',
-    name: 'Atomic Chat (Local)',
-    authType: 'none',
-    envKeys: [],
-  },
-  {
-    id: 'custom',
-    name: 'Custom OpenAI-compatible',
-    authType: 'api_key',
-    envKeys: [],
-  },
-]
 
 function readConfig(): Record<string, unknown> {
   try {
@@ -196,7 +136,7 @@ export const Route = createFileRoute('/api/hermes-config')({
         const env = readEnv()
 
         // Build provider status
-        const providerStatus = PROVIDERS.map((p) => {
+        const providerStatus = HERMES_PROVIDERS.map((p) => {
           const hasEnvKey =
             p.envKeys.length === 0 || p.envKeys.some((k) => !!env[k])
           const authStoreCheck = checkAuthStore(p.id)

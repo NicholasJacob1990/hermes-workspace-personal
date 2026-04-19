@@ -34,6 +34,14 @@ import { Input } from '@/components/ui/input'
 import { LogoLoader } from '@/components/logo-loader'
 import { BrailleSpinner } from '@/components/ui/braille-spinner'
 import { ThreeDotsSpinner } from '@/components/ui/three-dots-spinner'
+import { getPipecatVoiceBridgeStatus } from '@/lib/pipecat-voice'
+import {
+  VOICE_FALLBACK_PROVIDER_OPTIONS,
+  VOICE_PIPECAT_TOGGLE_FIELDS,
+  VOICE_RECOMMENDED_STACK,
+  VOICE_STT_PROVIDER_OPTIONS,
+  VOICE_TTS_PROVIDER_OPTIONS,
+} from '@/lib/voice-settings-options'
 // useWorkspaceStore removed — hamburger eliminated on mobile
 
 export const Route = createFileRoute('/settings/')({
@@ -1123,12 +1131,18 @@ function HermesConfigSection({
     ? (data.config.custom_providers as Array<Record<string, unknown>>)
     : []
 
-  const ttsProvider = (ttsConfig.provider as string) || 'edge'
+  const ttsProvider = (ttsConfig.provider as string) || VOICE_RECOMMENDED_STACK.ttsProvider
+  const ttsFallbackProvider = (ttsConfig.fallback_provider as string) || VOICE_RECOMMENDED_STACK.fallbackProvider
   const ttsEdge = (ttsConfig.edge as Record<string, unknown>) || {}
   const ttsElevenLabs = (ttsConfig.elevenlabs as Record<string, unknown>) || {}
   const ttsOpenAi = (ttsConfig.openai as Record<string, unknown>) || {}
+  const ttsGemini = (ttsConfig.gemini as Record<string, unknown>) || {}
+  const ttsMistral = (ttsConfig.mistral as Record<string, unknown>) || {}
   const sttProvider = (sttConfig.provider as string) || 'local'
   const sttLocal = (sttConfig.local as Record<string, unknown>) || {}
+  const sttMistral = (sttConfig.mistral as Record<string, unknown>) || {}
+  const pipecatConfig = (data.config.pipecat as Record<string, unknown>) || {}
+  const pipecatVoiceStatus = getPipecatVoiceBridgeStatus(data.config, data.providers)
 
   const renderHermesOverview = () => (
     <>
@@ -1621,7 +1635,7 @@ function HermesConfigSection({
       >
         <SettingsRow
           label="TTS provider"
-          description="Which TTS engine to use."
+          description="Recommended for Telegram: Edge as base voice, with Mistral as fallback."
         >
           <select
             value={ttsProvider}
@@ -1630,10 +1644,29 @@ function HermesConfigSection({
             }
             className={selectClassName}
           >
-            <option value="edge">Edge TTS (free)</option>
-            <option value="elevenlabs">ElevenLabs</option>
-            <option value="openai">OpenAI TTS</option>
-            <option value="neutts">NeuTTS</option>
+            {VOICE_TTS_PROVIDER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </SettingsRow>
+        <SettingsRow
+          label="Fallback provider"
+          description="Recommended: Mistral Voxtral for Telegram voice resilience."
+        >
+          <select
+            value={ttsFallbackProvider}
+            onChange={(e) =>
+              void saveConfig({ config: { tts: { fallback_provider: e.target.value } } })
+            }
+            className={selectClassName}
+          >
+            {VOICE_FALLBACK_PROVIDER_OPTIONS.map((option) => (
+              <option key={option.value || 'none'} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </SettingsRow>
 
@@ -1719,6 +1752,64 @@ function HermesConfigSection({
             </SettingsRow>
           </>
         )}
+
+        {ttsProvider === 'gemini' && (
+          <>
+            <SettingsRow label="Voice" description="Gemini TTS voice preset.">
+              <Input
+                value={(ttsGemini.voice as string) || 'Kore'}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: { tts: { gemini: { ...ttsGemini, voice: e.target.value } } },
+                  })
+                }
+                className="md:w-64"
+              />
+            </SettingsRow>
+            <SettingsRow label="Model" description="Gemini TTS model.">
+              <Input
+                value={(ttsGemini.model as string) || 'gemini-2.5-flash-preview-tts'}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: { tts: { gemini: { ...ttsGemini, model: e.target.value } } },
+                  })
+                }
+                className="md:w-64"
+              />
+            </SettingsRow>
+          </>
+        )}
+
+        {ttsProvider === 'mistral' && (
+          <>
+            <SettingsRow label="Voice ID" description="Mistral Voxtral voice UUID.">
+              <Input
+                value={(ttsMistral.voice_id as string) || ''}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: {
+                      tts: { mistral: { ...ttsMistral, voice_id: e.target.value } },
+                    },
+                  })
+                }
+                className="md:w-64"
+              />
+            </SettingsRow>
+            <SettingsRow label="Model" description="Mistral Voxtral TTS model.">
+              <Input
+                value={(ttsMistral.model as string) || 'voxtral-mini-tts-2603'}
+                onChange={(e) =>
+                  void saveConfig({
+                    config: {
+                      tts: { mistral: { ...ttsMistral, model: e.target.value } },
+                    },
+                  })
+                }
+                className="md:w-64"
+              />
+            </SettingsRow>
+          </>
+        )}
       </SettingsSection>
 
       <SettingsSection
@@ -1745,8 +1836,11 @@ function HermesConfigSection({
             }
             className={selectClassName}
           >
-            <option value="local">Local (Whisper)</option>
-            <option value="openai">OpenAI Whisper API</option>
+            {VOICE_STT_PROVIDER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </SettingsRow>
         {sttProvider === 'local' && (
@@ -1771,6 +1865,96 @@ function HermesConfigSection({
             </select>
           </SettingsRow>
         )}
+        {sttProvider === 'mistral' && (
+          <SettingsRow label="Model" description="Mistral Voxtral transcription model.">
+            <Input
+              value={(sttMistral.model as string) || 'voxtral-mini-latest'}
+              onChange={(e) =>
+                void saveConfig({
+                  config: { stt: { mistral: { ...sttMistral, model: e.target.value } } },
+                })
+              }
+              className="md:w-64"
+            />
+          </SettingsRow>
+        )}
+      </SettingsSection>
+
+      <SettingsSection
+        title="Pipecat + Gemini Live"
+        description="Use Gemini Live as the realtime voice layer while Hermes stays the downstream agent brain."
+        icon={SparklesIcon}
+      >
+        <SettingsRow
+          label="Gemini API key"
+          description="Stored in ~/.hermes/.env via the Google Gemini provider entry."
+        >
+          <span
+            className="text-sm font-medium"
+            style={{
+              color: pipecatVoiceStatus.geminiKeyConfigured
+                ? 'var(--theme-accent)'
+                : 'var(--theme-muted)',
+            }}
+          >
+            {pipecatVoiceStatus.geminiKeyConfigured ? 'Configured' : 'Missing'}
+          </span>
+        </SettingsRow>
+        <SettingsRow
+          label="Bridge config"
+          description="Hermes global config already exposes the Pipecat bridge defaults."
+        >
+          <span
+            className="text-sm font-medium"
+            style={{
+              color: pipecatVoiceStatus.pipecatConfigured
+                ? 'var(--theme-accent)'
+                : 'var(--theme-muted)',
+            }}
+          >
+            {pipecatVoiceStatus.pipecatConfigured ? 'Ready' : 'Not configured'}
+          </span>
+        </SettingsRow>
+        {VOICE_PIPECAT_TOGGLE_FIELDS.map((field) => (
+          <SettingsRow
+            key={field.key}
+            label={field.label}
+            description={field.description}
+          >
+            <Switch
+              checked={readBoolean(
+                pipecatConfig[field.key],
+                VOICE_RECOMMENDED_STACK.telegramVoiceLive,
+              )}
+              onCheckedChange={(checked) =>
+                void saveConfig({ config: { pipecat: { [field.key]: checked } } })
+              }
+            />
+          </SettingsRow>
+        ))}
+        <div className="rounded-xl border border-primary-200 bg-primary-100/40 p-3 text-sm text-primary-700">
+          Bootstrap script: <span className="font-mono">scripts/bootstrap-pipecat-gemini-live.sh</span>
+          <br />
+          Example bot: <span className="font-mono">examples/pipecat_gemini_live_hermes_bot.py</span>
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:justify-end">
+          <Button size="sm" variant="outline" asChild>
+            <Link to="/settings/providers">Open provider setup</Link>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              window.open(
+                'https://aistudio.google.com/app/apikey',
+                '_blank',
+                'noopener,noreferrer',
+              )
+            }
+          >
+            Open Gemini key page
+          </Button>
+        </div>
       </SettingsSection>
     </div>
   )
